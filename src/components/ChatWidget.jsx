@@ -5,7 +5,7 @@ import ChatInput from "./ChatInput";
 import ChatbotConfig from "../config/chatbotConfig";
 import ChatIcon from "@mui/icons-material/Chat";
 import LoadingDots from "./common/LoadingDots";
-
+ 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -13,9 +13,9 @@ export default function ChatWidget() {
   ]);
   const [loading, setLoading] = useState(false);
   const [attachments, setAttachments] = useState([]);
-
-  const handleSend = (text) => {
-    setMessages((prev) => [...prev, { from: "user", text }]);
+ 
+  const handleSend = (msg) => {
+    setMessages((prev) => [...prev, { from: "user", ...msg }]);
     setLoading(true);
     setTimeout(() => {
       setMessages((prev) => [
@@ -26,14 +26,11 @@ export default function ChatWidget() {
     }, 5000);
     setAttachments([]); // clear attachments after send
   };
-
+ 
   const handleAttach = (files) => {
-    files.forEach((file) => {
-      setMessages((prev) => [...prev, { from: "user", type: "file", file }]);
-    });
-    setAttachments((prev) => [...prev, ...files].slice(0, 2));
+    setAttachments(files);
   };
-
+ 
   const handleAudio = (audioBlob) => {
     const audioUrl = URL.createObjectURL(audioBlob);
     setMessages((prev) => [...prev, { from: "user", type: "audio", audioUrl }]);
@@ -46,7 +43,19 @@ export default function ChatWidget() {
       setLoading(false);
     }, 5000);
   };
-
+ 
+  // Handler for cross (clear and close)
+  const handleClose = () => {
+    setMessages([{ from: "bot", text: "Hello! How can I help you?" }]);
+    setAttachments([]);
+    setOpen(false);
+  };
+ 
+  // Handler for minimize (just close, keep history)
+  const handleMinimize = () => {
+    setOpen(false);
+  };
+ 
   if (!open) {
     return (
       <IconButton
@@ -68,7 +77,7 @@ export default function ChatWidget() {
       </IconButton>
     );
   }
-
+ 
   return (
     <Paper
       elevation={6}
@@ -100,7 +109,22 @@ export default function ChatWidget() {
         <Typography variant="h6" sx={{ flex: 1 }}>
           {ChatbotConfig.botName}
         </Typography>
-        <IconButton onClick={() => setOpen(false)} sx={{ color: "#fff" }}>
+        {/* Minimize Button */}
+        <IconButton
+          onClick={handleMinimize}
+          sx={{ color: "#fff" }}
+          size="small"
+          title="Minimize"
+        >
+          <span style={{ fontSize: 22, fontWeight: "bold" }}>–</span>
+        </IconButton>
+        {/* Close Button */}
+        <IconButton
+          onClick={handleClose}
+          sx={{ color: "#fff" }}
+          size="small"
+          title="Close"
+        >
           ×
         </IconButton>
       </Box>
@@ -126,3 +150,6 @@ export default function ChatWidget() {
     </Paper>
   );
 }
+ 
+ 
+ 

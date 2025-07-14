@@ -4,7 +4,10 @@ import SendIcon from "@mui/icons-material/Send";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
 import ChatbotConfig from "../config/chatbotConfig";
-
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import ImageIcon from '@mui/icons-material/Image';
+ 
 export default function ChatInput({
   onSend,
   onAttach,
@@ -14,66 +17,89 @@ export default function ChatInput({
 }) {
   const [input, setInput] = useState("");
   const fileInputRef = useRef(null);
-
+ 
   // Audio recording state
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunks = useRef([]);
-
+ 
+  // Speech-to-text handlers using Web Speech API
+  const recognitionRef = useRef(null);
+ 
   // File attach handler
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    // Only allow xls/csv and max 2 files
-    const validFiles = files
-      .filter(
-        (file) =>
-          file.type === "application/vnd.ms-excel" ||
-          file.type === "text/csv" ||
-          file.name.endsWith(".xls") ||
-          file.name.endsWith(".csv")
-      )
-      .slice(0, 2 - attachments.length);
-    if (validFiles.length) {
-      onAttach(validFiles);
+    // Only allow xls/csv/pdf/jpg/jpeg/png
+    const validFiles = files.filter(
+      (file) =>
+        file.type === "application/vnd.ms-excel" ||
+        file.type === "application/pdf" ||
+        file.type === "image/jpeg" ||
+        file.type === "image/png" ||
+        file.type === "text/csv" ||
+        file.name.endsWith(".xls") ||
+        file.name.endsWith(".csv") ||
+        file.name.endsWith(".pdf") ||
+        file.name.endsWith(".jpg") ||
+        file.name.endsWith(".jpeg") ||
+        file.name.endsWith(".png")
+    );
+    // Combine with existing attachments, but max 2
+    const combined = [...attachments, ...validFiles].slice(0, 2);
+    if (combined.length > 0) {
+      onAttach(combined);
     }
     e.target.value = "";
   };
-
+ 
   // Audio record handlers
-  const handleMicClick = async () => {
+  const handleMicClick = () => {
     if (recording) {
-      mediaRecorderRef.current.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
       setRecording(false);
     } else {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        mediaRecorderRef.current = new window.MediaRecorder(stream);
-        audioChunks.current = [];
-        mediaRecorderRef.current.ondataavailable = (e) => {
-          audioChunks.current.push(e.data);
-        };
-        mediaRecorderRef.current.onstop = async () => {
-          const audioBlob = new Blob(audioChunks.current, {
-            type: "audio/wav",
-          });
-          // Convert audio to text (mock, replace with real API)
-          onAudio(audioBlob);
-        };
-        mediaRecorderRef.current.start();
-        setRecording(true);
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Speech Recognition is not supported in this browser.");
+        return;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+      };
+      recognition.onerror = (event) => {
+        alert("Speech recognition error: " + event.error);
+      };
+      recognition.onend = () => {
+        setRecording(false);
+      };
+      recognitionRef.current = recognition;
+      recognition.start();
+      setRecording(true);
+    }
+  };
+ 
+  const handleSend = () => {
+    if ((input.trim() || attachments.length > 0) && !disabled) {
+      onSend({
+        text: input.trim() || undefined,
+        files:
+          attachments.length > 0 ? attachments : undefined,
+      });
+      setInput("");
+      if (attachments.length > 0) {
+        setAttachments([]);
       }
     }
   };
-
-  const handleSend = () => {
-    if (input.trim() && !disabled) {
-      onSend(input);
-      setInput("");
-    }
-  };
-
+ 
   return (
     <Box sx={{ display: "flex", alignItems: "center" }}>
       {ChatbotConfig.enableAttachment && (
@@ -81,7 +107,7 @@ export default function ChatInput({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.xls"
+            accept=".csv,.xls,.pdf,.jpg,.jpeg,.png"
             multiple
             style={{ display: "none" }}
             onChange={handleFileChange}
@@ -99,16 +125,52 @@ export default function ChatInput({
           </Tooltip>
         </>
       )}
-      <TextField
-        fullWidth
-        size="small"
-        variant="outlined"
-        placeholder={recording ? "Listening..." : "Type a message..."}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-        disabled={disabled || recording}
-      />
+      {/* Input and file preview column */}
+      <Box sx={{ display: "flex", flexDirection: "column", flex: 1, mr: 1 }}>
+        <TextField
+          fullWidth
+          size="small"
+          variant="outlined"
+          placeholder={recording ? "Listening..." : "Type a message..."}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          disabled={disabled || recording}
+          sx={{ mb: attachments.length > 0 ? 1 : 0 }}
+        />
+        {/* Show attached files before sending */}
+        {attachments.length > 0 && (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", maxWidth: 240 }}>
+            {attachments.map((file, idx) => {
+              let icon = <AttachFileIcon fontSize="small" sx={{ mr: 0.5 }} />;
+              if (file.name.toLowerCase().endsWith('.csv')) {
+                icon = <InsertDriveFileIcon sx={{ color: '#1976d2', mr: 1 }} />;
+              } else if (file.name.toLowerCase().endsWith('.pdf')) {
+                icon = <PictureAsPdfIcon sx={{ color: 'red', mr: 1 }} />;
+              } else if (
+                file.name.toLowerCase().endsWith('.jpg') ||
+                file.name.toLowerCase().endsWith('.jpeg') ||
+                file.name.toLowerCase().endsWith('.png')
+              ) {
+                icon = <ImageIcon sx={{ color: '#388e3c', mr: 1 }} />;
+              }
+              return (
+                <Box key={idx} sx={{ display: "flex", alignItems: "center", mb: 0.5, bgcolor: '#f5f5f5', borderRadius: 1, px: 1, py: 0.5 }}>
+                  {icon}
+                  <span style={{ fontSize: 13, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                  <IconButton size="small" sx={{ ml: 0.5 }} onClick={() => {
+                    // Remove the file at idx from attachments and update parent state
+                    const newFiles = attachments.filter((_, i) => i !== idx);
+                    onAttach(newFiles);
+                  }}>
+                    ×
+                  </IconButton>
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
       {ChatbotConfig.enableAudio && (
         <Tooltip title={recording ? "Stop recording" : "Record audio"}>
           <span>
@@ -132,3 +194,6 @@ export default function ChatInput({
     </Box>
   );
 }
+ 
+ 
+ 
