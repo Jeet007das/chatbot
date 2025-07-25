@@ -8,7 +8,7 @@ const chatbotConfig = {
   botTextColor: "#333",
   headerBg: "#1976d2",
   headerText: "#fff",
-  enableAttachment: false, // <-- dynamic control
+  enableAttachment: true, // <-- dynamic control
   enableAudio: true, // <-- dynamic control
 };
 export default chatbotConfig;
